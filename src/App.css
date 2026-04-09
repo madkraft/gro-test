@@ -1,0 +1,33 @@
+.app {
+  text-align: center;
+  padding: 2rem;
+  max-width: 24rem;
+}
+
+.app__title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 1.5rem;
+}
+
+.app__record {
+  padding: 1.25rem 1.75rem;
+  font-size: 1.125rem;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.app__record:active {
+  background: #1d4ed8;
+}
+
+.app__status {
+  margin-top: 1.25rem;
+  color: #444;
+  font-size: 0.95rem;
+}
