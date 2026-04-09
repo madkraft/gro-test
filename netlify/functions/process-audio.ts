@@ -1,4 +1,8 @@
-import { GoogleGenAI, createPartFromBase64, createUserContent } from "@google/genai";
+import {
+  GoogleGenAI,
+  createPartFromBase64,
+  createUserContent,
+} from "@google/genai";
 import type { Handler } from "@netlify/functions";
 
 const PROMPT = `Listen to the audio. The speaker is listing groceries in Polish and English.
@@ -19,7 +23,10 @@ export const handler: Handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: false, error: "Missing GEMINI_API_KEY." }),
+      body: JSON.stringify({
+        success: false,
+        error: "Missing GEMINI_API_KEY.",
+      }),
     };
   }
 
@@ -30,14 +37,17 @@ export const handler: Handler = async (event) => {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ success: false, error: "Expected JSON body with audioData (base64)." }),
+        body: JSON.stringify({
+          success: false,
+          error: "Expected JSON body with audioData (base64).",
+        }),
       };
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: "gemma-4-26b-a4b-it",
+      model: "gemma-4-e4b-it",
       contents: createUserContent([
         createPartFromBase64(audioData, "audio/webm"),
         PROMPT,
@@ -58,7 +68,10 @@ export const handler: Handler = async (event) => {
       return {
         statusCode: 500,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ success: false, error: "AI returned invalid format." }),
+        body: JSON.stringify({
+          success: false,
+          error: "AI returned invalid format.",
+        }),
       };
     }
 
@@ -76,7 +89,10 @@ export const handler: Handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: false, error: "Failed to process audio." }),
+      body: JSON.stringify({
+        success: false,
+        error: "Failed to process audio.",
+      }),
     };
   }
 };
