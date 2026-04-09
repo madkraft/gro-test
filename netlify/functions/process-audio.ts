@@ -9,6 +9,8 @@ import type { Handler } from "@netlify/functions";
 
 const databaseId = process.env.NOTION_DATABASE_ID;
 
+const GEMINI_MODEL = "gemini-2.5-flash";
+
 type GroceryItem = { item: string; category: string };
 
 const OUTPUT_JSON_INSTRUCTIONS = `Extract the items, translate them to Polish, and output the result STRICTLY
@@ -75,8 +77,7 @@ export const handler: Handler = async (event) => {
       typeof body.audioData === "string" && body.audioData.length > 0
         ? body.audioData
         : undefined;
-    const listText =
-      typeof body.text === "string" ? body.text.trim() : "";
+    const listText = typeof body.text === "string" ? body.text.trim() : "";
 
     if (!listText && !audioData) {
       return {
@@ -95,7 +96,7 @@ export const handler: Handler = async (event) => {
     let response;
     if (listText.length > 0) {
       response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         contents: createUserContent([
           `The user typed this grocery list (Polish and/or English). Use only this list as the source.
 
@@ -119,7 +120,7 @@ ${OUTPUT_JSON_INSTRUCTIONS}`,
         };
       }
       response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         contents: createUserContent([
           createPartFromBase64(audioData, "audio/webm"),
           PROMPT_AUDIO,
