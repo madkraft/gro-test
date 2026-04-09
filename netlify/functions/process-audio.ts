@@ -1,4 +1,5 @@
 import {
+  ApiError,
   GoogleGenAI,
   createPartFromBase64,
   createUserContent,
@@ -47,7 +48,7 @@ export const handler: Handler = async (event) => {
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: "gemma-4-e4b-it",
+      model: "gemini-2.5-flash",
       contents: createUserContent([
         createPartFromBase64(audioData, "audio/webm"),
         PROMPT,
@@ -86,13 +87,16 @@ export const handler: Handler = async (event) => {
     };
   } catch (err) {
     console.error(err);
+    const message =
+      err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "Failed to process audio.";
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        success: false,
-        error: "Failed to process audio.",
-      }),
+      body: JSON.stringify({ success: false, error: message }),
     };
   }
 };
