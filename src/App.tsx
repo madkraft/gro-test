@@ -32,6 +32,9 @@ export default function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const hasSpokenRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const submitPayload = useCallback(
     async (payload: { audioData?: string; text?: string }) => {
@@ -91,6 +94,34 @@ export default function App() {
         return;
       }
       streamRef.current = stream;
+      hasSpokenRef.current = false;
+
+      const AudioContextCtor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      audioContextRef.current = new AudioContextCtor();
+      const analyser = audioContextRef.current.createAnalyser();
+      audioContextRef.current.createMediaStreamSource(stream).connect(analyser);
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const checkAudioLevel = () => {
+        analyser.getByteTimeDomainData(dataArray);
+        let sumSquares = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const norm = dataArray[i] / 128.0 - 1.0;
+          sumSquares += norm * norm;
+        }
+        if (Math.sqrt(sumSquares / dataArray.length) > 0.05) {
+          hasSpokenRef.current = true;
+        }
+        if (!hasSpokenRef.current && stream.active) {
+          animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+        }
+      };
+      checkAudioLevel();
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -109,6 +140,20 @@ export default function App() {
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
         mediaRecorderRef.current = null;
+
+        if (animationFrameRef.current !== null) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        if (audioContextRef.current) {
+          void audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
+
+        if (!hasSpokenRef.current) {
+          setStatus("Didn't hear anything. Try again!");
+          return;
+        }
 
         const audioData = await blobToBase64(audioBlob);
         await submitPayload({ audioData });
