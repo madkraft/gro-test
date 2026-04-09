@@ -4,11 +4,31 @@ import {
   createPartFromBase64,
   createUserContent,
 } from "@google/genai";
+import { Client } from "@notionhq/client";
 import type { Handler } from "@netlify/functions";
+
+const databaseId = process.env.NOTION_DATABASE_ID;
+
+type GroceryItem = { item: string; category: string };
 
 const PROMPT = `Listen to the audio. The speaker is listing groceries in Polish and English.
         Extract the items, translate them to Polish, and output the result STRICTLY
-        as a JSON array of objects with 'item' and 'quantity' keys. Do not include markdown.`;
+        as a JSON array of objects. Do not include markdown.
+
+        Each object MUST have two keys:
+        1. 'item' (string): The name of the product.
+        2. 'category' (string): You MUST categorize the item into EXACTLY ONE of the following predefined categories (including the emoji):
+          - "🥯 Piekarnia"
+          - "🥤 Napoje"
+          - "🍇 Owoce i warzywa"
+          - "🧊 Lodówka / mleczny"
+          - "🛒 Rossmann / apteka"
+          - "🥩 Mięso"
+          - "🍜 Sypane / przyprawy"
+          - "🏠 Dla domu"
+          - "👶 Tadziu"
+          - "🧒 Julcia"
+          If you cannot figure out the category, use "❓ Inne".`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -27,6 +47,18 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         success: false,
         error: "Missing GEMINI_API_KEY.",
+      }),
+    };
+  }
+
+  const notionApiKey = process.env.NOTION_API_KEY;
+  if (!notionApiKey || !databaseId) {
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        success: false,
+        error: "Missing NOTION_API_KEY or NOTION_DATABASE_ID.",
       }),
     };
   }
@@ -61,9 +93,13 @@ export const handler: Handler = async (event) => {
       .replace(/```\s*/g, "")
       .trim();
 
-    let groceryItems: unknown;
+    let groceryItems: GroceryItem[];
     try {
-      groceryItems = JSON.parse(cleanText) as unknown;
+      const parsed = JSON.parse(cleanText) as unknown;
+      if (!Array.isArray(parsed)) {
+        throw new Error("Expected JSON array");
+      }
+      groceryItems = parsed as GroceryItem[];
     } catch (parseError) {
       console.error("Failed to parse JSON from AI:", text, parseError);
       return {
@@ -74,6 +110,28 @@ export const handler: Handler = async (event) => {
           error: "AI returned invalid format.",
         }),
       };
+    }
+
+    const notionClient = new Client({ auth: notionApiKey });
+
+    for (const item of groceryItems) {
+      const name = typeof item.item === "string" ? item.item : "";
+      const category =
+        typeof item.category === "string" && item.category.trim() !== ""
+          ? item.category
+          : "❓ Inne";
+
+      await notionClient.pages.create({
+        parent: { database_id: databaseId },
+        properties: {
+          Name: {
+            title: [{ text: { content: name } }],
+          },
+          Category: {
+            select: { name: category },
+          },
+        },
+      });
     }
 
     return {
@@ -92,7 +150,7 @@ export const handler: Handler = async (event) => {
         ? err.message
         : err instanceof Error
           ? err.message
-          : "Failed to process audio.";
+          : "Failed to process audio or save to Notion.";
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
