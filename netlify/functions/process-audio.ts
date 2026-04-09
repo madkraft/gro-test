@@ -46,12 +46,15 @@ export const handler: Handler = async (event) => {
 
     const text = response.text ?? "";
     const groceryItems = JSON.parse(text) as unknown;
-    console.log(groceryItems);
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: true, message: "Added to Notion!" }),
+      body: JSON.stringify({
+        success: true,
+        message: "Added to Notion!",
+        items: groceryItems,
+      }),
     };
   } catch (err) {
     console.error(err);

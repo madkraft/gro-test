@@ -31,3 +31,24 @@
   color: #444;
   font-size: 0.95rem;
 }
+
+.app__items {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.app__item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.95rem;
+}
+
+.app__item:last-child {
+  border-bottom: none;
+}
+
+.app__item-qty {
+  color: #6b7280;
+}

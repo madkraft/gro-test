@@ -3,6 +3,8 @@ import "./App.css";
 
 const PROCESS_AUDIO_PATH = "/.netlify/functions/process-audio";
 
+type GroceryItem = { item: string; quantity?: string | number };
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -23,6 +25,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 export default function App() {
   const [status, setStatus] = useState("");
+  const [items, setItems] = useState<GroceryItem[] | null>(null);
   const holdingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -77,13 +80,27 @@ export default function App() {
           const payload = (await response.json()) as {
             success?: boolean;
             error?: string;
+            items?: unknown;
           };
           if (!response.ok || payload.success === false) {
+            setItems(null);
             setStatus(payload.error ?? "Error saving list.");
             return;
           }
+          const raw = payload.items;
+          const nextItems = Array.isArray(raw)
+            ? raw.filter(
+                (row): row is GroceryItem =>
+                  row !== null &&
+                  typeof row === "object" &&
+                  "item" in row &&
+                  typeof (row as GroceryItem).item === "string",
+              )
+            : [];
+          setItems(nextItems.length > 0 ? nextItems : null);
           setStatus("Added to Notion!");
         } catch {
+          setItems(null);
           setStatus("Error saving list.");
         }
       };
@@ -116,6 +133,18 @@ export default function App() {
         Hold to Speak
       </button>
       {status ? <p className="app__status">{status}</p> : null}
+      {items ? (
+        <ul className="app__items">
+          {items.map((row, i) => (
+            <li key={`${row.item}-${i}`} className="app__item">
+              <span className="app__item-name">{row.item}</span>
+              {row.quantity !== undefined ? (
+                <span className="app__item-qty"> × {String(row.quantity)}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </main>
   );
 }
