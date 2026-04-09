@@ -37,7 +37,7 @@ export default function App() {
   const animationFrameRef = useRef<number | null>(null);
 
   const submitPayload = useCallback(
-    async (payload: { audioData?: string; text?: string }) => {
+    async (payload: { audioData?: string; text?: string }): Promise<boolean> => {
       setStatus("Processing list…");
       try {
         const response = await fetch(PROCESS_AUDIO_PATH, {
@@ -53,7 +53,7 @@ export default function App() {
         if (!response.ok || payloadJson.success === false) {
           setItems(null);
           setStatus(payloadJson.error ?? "Error saving list.");
-          return;
+          return false;
         }
         const raw = payloadJson.items;
         const nextItems = Array.isArray(raw)
@@ -67,9 +67,11 @@ export default function App() {
           : [];
         setItems(nextItems.length > 0 ? nextItems : null);
         setStatus("Added to Notion!");
+        return true;
       } catch {
         setItems(null);
         setStatus("Error saving list.");
+        return false;
       }
     },
     [],
@@ -174,8 +176,10 @@ export default function App() {
       return;
     }
     void (async () => {
-      await submitPayload({ text: trimmed });
-      setListText("");
+      const ok = await submitPayload({ text: trimmed });
+      if (ok) {
+        setListText("");
+      }
     })();
   };
 
