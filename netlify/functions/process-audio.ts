@@ -45,7 +45,22 @@ export const handler: Handler = async (event) => {
     });
 
     const text = response.text ?? "";
-    const groceryItems = JSON.parse(text) as unknown;
+    const cleanText = text
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
+
+    let groceryItems: unknown;
+    try {
+      groceryItems = JSON.parse(cleanText) as unknown;
+    } catch (parseError) {
+      console.error("Failed to parse JSON from AI:", text, parseError);
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ success: false, error: "AI returned invalid format." }),
+      };
+    }
 
     return {
       statusCode: 200,
