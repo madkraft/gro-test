@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import "./App.css";
 
 const PROCESS_AUDIO_PATH = "/.netlify/functions/process-audio";
 
-type GroceryItem = { item: string; quantity?: string | number };
+type GroceryItem = { item: string; category?: string };
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,7 +18,8 @@ function blobToBase64(blob: Blob): Promise<string> {
       const base64 = comma >= 0 ? result.slice(comma + 1) : result;
       resolve(base64);
     };
-    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("FileReader failed"));
     reader.readAsDataURL(blob);
   });
 }
@@ -26,10 +27,50 @@ function blobToBase64(blob: Blob): Promise<string> {
 export default function App() {
   const [status, setStatus] = useState("");
   const [items, setItems] = useState<GroceryItem[] | null>(null);
+  const [listText, setListText] = useState("");
   const holdingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const submitPayload = useCallback(
+    async (payload: { audioData?: string; text?: string }) => {
+      setStatus("Processing list…");
+      try {
+        const response = await fetch(PROCESS_AUDIO_PATH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const payloadJson = (await response.json()) as {
+          success?: boolean;
+          error?: string;
+          items?: unknown;
+        };
+        if (!response.ok || payloadJson.success === false) {
+          setItems(null);
+          setStatus(payloadJson.error ?? "Error saving list.");
+          return;
+        }
+        const raw = payloadJson.items;
+        const nextItems = Array.isArray(raw)
+          ? raw.filter(
+              (row): row is GroceryItem =>
+                row !== null &&
+                typeof row === "object" &&
+                "item" in row &&
+                typeof (row as GroceryItem).item === "string",
+            )
+          : [];
+        setItems(nextItems.length > 0 ? nextItems : null);
+        setStatus("Added to Notion!");
+      } catch {
+        setItems(null);
+        setStatus("Error saving list.");
+      }
+    },
+    [],
+  );
 
   const stopRecording = useCallback(() => {
     holdingRef.current = false;
@@ -61,7 +102,6 @@ export default function App() {
       };
 
       mediaRecorder.onstop = async () => {
-        setStatus("Processing list…");
         const chunks = audioChunksRef.current;
         const audioBlob = new Blob(chunks, { type: "audio/webm" });
         audioChunksRef.current = [];
@@ -70,39 +110,8 @@ export default function App() {
         streamRef.current = null;
         mediaRecorderRef.current = null;
 
-        try {
-          const audioData = await blobToBase64(audioBlob);
-          const response = await fetch(PROCESS_AUDIO_PATH, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ audioData }),
-          });
-          const payload = (await response.json()) as {
-            success?: boolean;
-            error?: string;
-            items?: unknown;
-          };
-          if (!response.ok || payload.success === false) {
-            setItems(null);
-            setStatus(payload.error ?? "Error saving list.");
-            return;
-          }
-          const raw = payload.items;
-          const nextItems = Array.isArray(raw)
-            ? raw.filter(
-                (row): row is GroceryItem =>
-                  row !== null &&
-                  typeof row === "object" &&
-                  "item" in row &&
-                  typeof (row as GroceryItem).item === "string",
-              )
-            : [];
-          setItems(nextItems.length > 0 ? nextItems : null);
-          setStatus("Added to Notion!");
-        } catch {
-          setItems(null);
-          setStatus("Error saving list.");
-        }
+        const audioData = await blobToBase64(audioBlob);
+        await submitPayload({ audioData });
       };
 
       mediaRecorder.start();
@@ -110,11 +119,44 @@ export default function App() {
     } catch {
       setStatus("Microphone access denied or unavailable.");
     }
-  }, []);
+  }, [submitPayload]);
+
+  const handleTypedSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = listText.trim();
+    if (trimmed.length === 0) {
+      setStatus("Type a list first.");
+      return;
+    }
+    void (async () => {
+      await submitPayload({ text: trimmed });
+      setListText("");
+    })();
+  };
 
   return (
     <main className="app">
-      <h1 className="app__title">Say what we need to buy 🛒</h1>
+      <h1 className="app__title">Say or type what we need to buy 🛒</h1>
+
+      <form className="app__form" onSubmit={handleTypedSubmit}>
+        <label className="app__label" htmlFor="grocery-text">
+          Or type your list
+        </label>
+        <textarea
+          id="grocery-text"
+          className="app__textarea"
+          rows={4}
+          value={listText}
+          onChange={(e) => setListText(e.target.value)}
+          placeholder="mleko, chleb, pomidory…"
+        />
+        <button type="submit" className="app__submit">
+          Send to list
+        </button>
+      </form>
+
+      <p className="app__divider">or hold to speak</p>
+
       <button
         type="button"
         className="app__record"
@@ -132,14 +174,18 @@ export default function App() {
       >
         Hold to Speak
       </button>
-      {status ? <p className="app__status">{status}</p> : null}
+      {status ? (
+        <p className="app__status">{status}</p>
+      ) : (
+        <p className="app__status">Ready to listen</p>
+      )}
       {items ? (
         <ul className="app__items">
           {items.map((row, i) => (
             <li key={`${row.item}-${i}`} className="app__item">
               <span className="app__item-name">{row.item}</span>
-              {row.quantity !== undefined ? (
-                <span className="app__item-qty"> × {String(row.quantity)}</span>
+              {row.category ? (
+                <span className="app__item-category"> — {row.category}</span>
               ) : null}
             </li>
           ))}

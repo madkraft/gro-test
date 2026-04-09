@@ -11,8 +11,7 @@ const databaseId = process.env.NOTION_DATABASE_ID;
 
 type GroceryItem = { item: string; category: string };
 
-const PROMPT = `Listen to the audio. The speaker is listing groceries in Polish and English.
-        Extract the items, translate them to Polish, and output the result STRICTLY
+const OUTPUT_JSON_INSTRUCTIONS = `Extract the items, translate them to Polish, and output the result STRICTLY
         as a JSON array of objects. Do not include markdown.
 
         Each object MUST have two keys:
@@ -29,6 +28,10 @@ const PROMPT = `Listen to the audio. The speaker is listing groceries in Polish 
           - "👶 Tadziu"
           - "🧒 Julcia"
           If you cannot figure out the category, use "❓ Inne".`;
+
+const PROMPT_AUDIO = `Listen to the audio. The speaker is listing groceries in Polish and English.
+
+${OUTPUT_JSON_INSTRUCTIONS}`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -64,28 +67,65 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const body = JSON.parse(event.body ?? "{}") as { audioData?: string };
-    const audioData = body.audioData;
-    if (!audioData || typeof audioData !== "string") {
+    const body = JSON.parse(event.body ?? "{}") as {
+      audioData?: string;
+      text?: string;
+    };
+    const audioData =
+      typeof body.audioData === "string" && body.audioData.length > 0
+        ? body.audioData
+        : undefined;
+    const listText =
+      typeof body.text === "string" ? body.text.trim() : "";
+
+    if (!listText && !audioData) {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           success: false,
-          error: "Expected JSON body with audioData (base64).",
+          error:
+            "Expected JSON body with non-empty text or audioData (base64).",
         }),
       };
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: createUserContent([
-        createPartFromBase64(audioData, "audio/webm"),
-        PROMPT,
-      ]),
-    });
+    let response;
+    if (listText.length > 0) {
+      response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: createUserContent([
+          `The user typed this grocery list (Polish and/or English). Use only this list as the source.
+
+---
+${listText}
+---
+
+${OUTPUT_JSON_INSTRUCTIONS}`,
+        ]),
+      });
+    } else {
+      if (audioData === undefined) {
+        return {
+          statusCode: 400,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            success: false,
+            error:
+              "Expected JSON body with non-empty text or audioData (base64).",
+          }),
+        };
+      }
+      response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: createUserContent([
+          createPartFromBase64(audioData, "audio/webm"),
+          PROMPT_AUDIO,
+        ]),
+      });
+    }
 
     const text = response.text ?? "";
     const cleanText = text
@@ -150,7 +190,7 @@ export const handler: Handler = async (event) => {
         ? err.message
         : err instanceof Error
           ? err.message
-          : "Failed to process audio or save to Notion.";
+          : "Failed to process input or save to Notion.";
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
