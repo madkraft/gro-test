@@ -277,6 +277,13 @@ function InputPage() {
           rows={4}
           value={listText}
           onChange={(e) => setListText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.shiftKey) {
+              return;
+            }
+            e.preventDefault();
+            e.currentTarget.form?.requestSubmit();
+          }}
           placeholder={offlineHint}
           disabled={!isOnline}
         />

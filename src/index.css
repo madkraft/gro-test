@@ -192,6 +192,7 @@ body {
 
 .page__record {
   width: 100%;
+  height: 100px;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0;
@@ -199,6 +200,11 @@ body {
   color: var(--fg);
   font: inherit;
   cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .page__record:active,
