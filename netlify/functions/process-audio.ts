@@ -1,36 +1,43 @@
-import {
-  ApiError,
-  GoogleGenAI,
-  createPartFromBase64,
-  createUserContent,
-} from "@google/genai";
+import { ApiError, GoogleGenAI, Type, createUserContent } from "@google/genai";
 import type { Handler } from "@netlify/functions";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
 type GroceryItem = { item: string; category: string };
 
-const OUTPUT_JSON_INSTRUCTIONS = `Extract the items, translate them to Polish, and output the result STRICTLY
-        as a JSON array of objects. Do not include markdown.
+const CATEGORIES = [
+  "🥯 Piekarnia",
+  "🥤 Napoje",
+  "🍇 Owoce i warzywa",
+  "🧊 Lodówka / mleczny",
+  "🛒 Rossmann / apteka",
+  "🥩 Mięso",
+  "🍜 Sypane / przyprawy",
+  "🏠 Dla domu",
+  "👶 Tadziu",
+  "🧒 Julcia",
+  "❓ Inne",
+];
 
-        Each object MUST have two keys:
-        1. 'item' (string): The name of the product.
-        2. 'category' (string): You MUST categorize the item into EXACTLY ONE of the following predefined categories (including the emoji):
-          - "🥯 Piekarnia"
-          - "🥤 Napoje"
-          - "🍇 Owoce i warzywa"
-          - "🧊 Lodówka / mleczny"
-          - "🛒 Rossmann / apteka"
-          - "🥩 Mięso"
-          - "🍜 Sypane / przyprawy"
-          - "🏠 Dla domu"
-          - "👶 Tadziu"
-          - "🧒 Julcia"
-          If you cannot figure out the category, use "❓ Inne".`;
+const grocerySchema = {
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      item: {
+        type: Type.STRING,
+        description: "The corrected name of the product",
+      },
+      category: { type: Type.STRING, enum: CATEGORIES },
+    },
+    required: ["item", "category"],
+  },
+};
 
-const PROMPT_AUDIO = `Listen to the audio. The speaker is listing groceries in Polish and English.
-
-${OUTPUT_JSON_INSTRUCTIONS}`;
+const generateConfig = {
+  responseMimeType: "application/json",
+  responseSchema: grocerySchema,
+};
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -54,89 +61,38 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const body = JSON.parse(event.body ?? "{}") as {
-      audioData?: string;
-      text?: string;
-    };
-    const audioData =
-      typeof body.audioData === "string" && body.audioData.length > 0
-        ? body.audioData
-        : undefined;
+    const body = JSON.parse(event.body ?? "{}") as { text?: string };
     const listText = typeof body.text === "string" ? body.text.trim() : "";
 
-    if (!listText && !audioData) {
+    if (!listText) {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           success: false,
-          error:
-            "Expected JSON body with non-empty text or audioData (base64).",
+          error: "Expected JSON body with non-empty text.",
         }),
       };
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
-    let response;
-    if (listText.length > 0) {
-      response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: createUserContent([
-          `The user typed this grocery list (Polish and/or English). Use only this list as the source.
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      config: generateConfig,
+      contents: createUserContent([
+        `The user provided this grocery list (Polish and/or English).
+         NOTE: If this was dictated, it was transcribed by a tiny, phonetically-challenged offline AI. Expect heavy misspellings, phonetic guesses, and butchered grammar (e.g., "Mlego" = Mleko, "wylep" = chleb, "pomidorę" = pomidory).
+         CRITICAL INSTRUCTION: Ignore all conversational filler, hesitations, and irrelevant chatter (like "No może", "yyy", "kupmy jeszcze"). Extract ONLY the actual grocery items.
+         Use context clues to correct the typos to the actual real-world grocery items. Extract the items, translate them to Polish, and categorize them.
 
----
-${listText}
----
+        ---
+        ${listText}
+        ---`,
+      ]),
+    });
 
-${OUTPUT_JSON_INSTRUCTIONS}`,
-        ]),
-      });
-    } else {
-      if (audioData === undefined) {
-        return {
-          statusCode: 400,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            success: false,
-            error:
-              "Expected JSON body with non-empty text or audioData (base64).",
-          }),
-        };
-      }
-      response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: createUserContent([
-          createPartFromBase64(audioData, "audio/webm"),
-          PROMPT_AUDIO,
-        ]),
-      });
-    }
-
-    const text = response.text ?? "";
-    const cleanText = text
-      .replace(/```json\s*/gi, "")
-      .replace(/```\s*/g, "")
-      .trim();
-
-    let groceryItems: GroceryItem[];
-    try {
-      const parsed = JSON.parse(cleanText) as unknown;
-      if (!Array.isArray(parsed)) {
-        throw new Error("Expected JSON array");
-      }
-      groceryItems = parsed as GroceryItem[];
-    } catch (parseError) {
-      console.error("Failed to parse JSON from AI:", text, parseError);
-      return {
-        statusCode: 500,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success: false,
-          error: "AI returned invalid format.",
-        }),
-      };
-    }
+    const groceryItems = JSON.parse(response.text ?? "[]") as GroceryItem[];
 
     return {
       statusCode: 200,

@@ -31,7 +31,7 @@ let transcriber: any = null;
 
 async function loadModel() {
   transcriber = await pipeline("automatic-speech-recognition", MODEL_ID, {
-    dtype: "q8",
+    dtype: "q4",
     progress_callback: (info: unknown) => {
       const p = info as ProgressInfo;
       if (p.status === "progress" || p.status === "downloading") {
@@ -77,6 +77,8 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
       const result = (await transcriber(msg.audio, {
         task: "transcribe",
         language: "polish",
+        return_timestamps: true,
+        chunk_length_s: 30,
       })) as { text?: string } | { text?: string }[];
       const text = Array.isArray(result)
         ? (result[0]?.text ?? "")
