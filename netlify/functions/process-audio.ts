@@ -1,4 +1,10 @@
-import { ApiError, GoogleGenAI, Type, createUserContent } from "@google/genai";
+import {
+  ApiError,
+  GoogleGenAI,
+  Type,
+  createPartFromBase64,
+  createUserContent,
+} from "@google/genai";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
@@ -38,6 +44,14 @@ const generateConfig = {
   responseSchema: grocerySchema,
 };
 
+const TEXT_PROMPT = `The user provided this grocery list (Polish and/or English).
+CRITICAL INSTRUCTION: Ignore all conversational filler, hesitations, and irrelevant chatter (like "No może", "yyy", "kupmy jeszcze"). Extract ONLY the actual grocery items.
+Extract the items, translate them to Polish, and categorize them.`;
+
+const AUDIO_PROMPT = `Listen to this audio recording. The speaker is listing groceries in Polish and/or English.
+CRITICAL INSTRUCTION: Ignore all conversational filler, hesitations, and irrelevant chatter (like "No może", "yyy", "kupmy jeszcze"). Extract ONLY the actual grocery items.
+Translate all items to Polish and categorize each one.`;
+
 export default async (req: Request) => {
   if (req.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
@@ -52,31 +66,41 @@ export default async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { text?: string };
-    const listText = typeof body.text === "string" ? body.text.trim() : "";
+    const body = (await req.json()) as {
+      text?: string;
+      audioData?: string;
+      mimeType?: string;
+    };
 
-    if (!listText) {
+    const listText = typeof body.text === "string" ? body.text.trim() : "";
+    const audioData =
+      typeof body.audioData === "string" ? body.audioData : null;
+    const mimeType =
+      typeof body.mimeType === "string" ? body.mimeType : "audio/webm";
+
+    if (!listText && !audioData) {
       return Response.json(
-        { success: false, error: "Expected JSON body with non-empty text." },
+        {
+          success: false,
+          error: "Expected JSON body with non-empty text or audioData.",
+        },
         { status: 400 },
       );
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
+    const contents = audioData
+      ? createUserContent([
+          createPartFromBase64(audioData, mimeType),
+          AUDIO_PROMPT,
+        ])
+      : createUserContent([`${TEXT_PROMPT}\n\n---\n${listText}\n---`]);
+
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       config: generateConfig,
-      contents: createUserContent([
-        `The user provided this grocery list (Polish and/or English).
-         NOTE: If this was dictated, it was transcribed by a tiny, phonetically-challenged offline AI. Expect heavy misspellings, phonetic guesses, and butchered grammar (e.g., "Mlego" = Mleko, "wylep" = chleb, "pomidorę" = pomidory).
-         CRITICAL INSTRUCTION: Ignore all conversational filler, hesitations, and irrelevant chatter (like "No może", "yyy", "kupmy jeszcze"). Extract ONLY the actual grocery items.
-         Use context clues to correct the typos to the actual real-world grocery items. Extract the items, translate them to Polish, and categorize them.
-
-        ---
-        ${listText}
-        ---`,
-      ]),
+      contents,
     });
 
     const groceryItems = JSON.parse(response.text ?? "[]") as GroceryItem[];

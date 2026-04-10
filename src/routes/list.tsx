@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
-import { getItems } from "../lib/storage";
 import type { GroceryItem } from "../types/grocery";
 
 export const Route = createFileRoute("/list")({
@@ -43,7 +42,7 @@ function ListPage() {
       return next;
     });
     window.setTimeout(() => {
-      const current = getItems().map((i) =>
+      const current = items.map((i) =>
         i.id === id ? { ...i, bought: true } : i,
       );
       updateList(current);

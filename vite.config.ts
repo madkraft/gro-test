@@ -10,10 +10,6 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["pwa-192x192.png", "pwa-512x512.png"],
-      // ONNX Runtime WASM (~23 MB) exceeds Workbox’s default 2 MiB precache limit.
-      workbox: {
-        maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
-      },
       manifest: {
         name: "Grocery Assistant",
         short_name: "Groceries",
