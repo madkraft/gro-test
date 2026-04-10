@@ -36,9 +36,6 @@ importers:
         specifier: ^19.2.0
         version: 19.2.5(react@19.2.5)
     devDependencies:
-      '@netlify/functions':
-        specifier: ^5.1.0
-        version: 5.1.5
       '@tanstack/router-cli':
         specifier: ^1.166.25
         version: 1.166.25
@@ -1441,10 +1438,6 @@ packages:
   '@netlify/functions-utils@6.2.29':
     resolution: {integrity: sha512-82VfLDTEXLl6LKKMlBUIektOOaIz4Bhdn1FI6zgRhE4uPDnDd1rhJZPZ1JXf7QUaj0xUfVQAf9cALnQR0y+8Qw==}
     engines: {node: '>=18.14.0'}
-
-  '@netlify/functions@5.1.5':
-    resolution: {integrity: sha512-mhTl6x3TWoRwNgz8HZ9zvSR9OHB/hDEA6VinBmWY5ubgycKNCerf6XyFaFnujH2Ygx3c32yg6QOOr1v9y8euug==}
-    engines: {node: '>=18.0.0'}
 
   '@netlify/git-utils@6.0.4':
     resolution: {integrity: sha512-yp5WucNt1PGV+qG9Bq/qXPHZyl375s2AfB7bdoCFi7VeHZzCJ4bZJB9OpWf8lwNKqzkc2njYygNo5kwKavzY/w==}
@@ -7637,10 +7630,6 @@ snapshots:
       - react-native-b4a
       - rollup
       - supports-color
-
-  '@netlify/functions@5.1.5':
-    dependencies:
-      '@netlify/types': 2.6.0
 
   '@netlify/git-utils@6.0.4':
     dependencies:

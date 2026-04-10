@@ -1,5 +1,4 @@
 import { ApiError, GoogleGenAI, Type, createUserContent } from "@google/genai";
-import type { Handler } from "@netlify/functions";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
@@ -39,40 +38,28 @@ const generateConfig = {
   responseSchema: grocerySchema,
 };
 
-export const handler: Handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Method not allowed" }),
-    };
+export default async (req: Request) => {
+  if (req.method !== "POST") {
+    return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        success: false,
-        error: "Missing GEMINI_API_KEY.",
-      }),
-    };
+    return Response.json(
+      { success: false, error: "Missing GEMINI_API_KEY." },
+      { status: 500 },
+    );
   }
 
   try {
-    const body = JSON.parse(event.body ?? "{}") as { text?: string };
+    const body = (await req.json()) as { text?: string };
     const listText = typeof body.text === "string" ? body.text.trim() : "";
 
     if (!listText) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success: false,
-          error: "Expected JSON body with non-empty text.",
-        }),
-      };
+      return Response.json(
+        { success: false, error: "Expected JSON body with non-empty text." },
+        { status: 400 },
+      );
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -94,15 +81,11 @@ export const handler: Handler = async (event) => {
 
     const groceryItems = JSON.parse(response.text ?? "[]") as GroceryItem[];
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        success: true,
-        message: "List parsed.",
-        items: groceryItems,
-      }),
-    };
+    return Response.json({
+      success: true,
+      message: "List parsed.",
+      items: groceryItems,
+    });
   } catch (err) {
     console.error(err);
     const message =
@@ -111,10 +94,6 @@ export const handler: Handler = async (event) => {
         : err instanceof Error
           ? err.message
           : "Failed to process input.";
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: false, error: message }),
-    };
+    return Response.json({ success: false, error: message }, { status: 500 });
   }
 };
