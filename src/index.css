@@ -263,6 +263,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  margin-top: 1rem;
 }
 
 .list__cat {
