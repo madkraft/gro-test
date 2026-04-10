@@ -6,7 +6,8 @@ import {
   createUserContent,
 } from "@google/genai";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_PRIMARY_MODEL = "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash-lite"] as const;
 
 type GroceryItem = { item: string; category: string };
 
@@ -97,11 +98,29 @@ export default async (req: Request) => {
         ])
       : createUserContent([`${TEXT_PROMPT}\n\n---\n${listText}\n---`]);
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      config: generateConfig,
-      contents,
-    });
+    const tryGenerate = (model: string) =>
+      ai.models.generateContent({ model, config: generateConfig, contents });
+
+    const isUnavailable = (err: unknown) =>
+      err instanceof ApiError && err.status === 503;
+
+    let modelUsed = GEMINI_PRIMARY_MODEL;
+    let response = await tryGenerate(GEMINI_PRIMARY_MODEL).catch(
+      async (primaryErr: unknown) => {
+        if (!isUnavailable(primaryErr)) throw primaryErr;
+
+        for (const fallback of GEMINI_FALLBACK_MODELS) {
+          try {
+            const res = await tryGenerate(fallback);
+            modelUsed = fallback;
+            return res;
+          } catch (fallbackErr) {
+            if (!isUnavailable(fallbackErr)) throw fallbackErr;
+          }
+        }
+        throw primaryErr;
+      },
+    );
 
     const groceryItems = JSON.parse(response.text ?? "[]") as GroceryItem[];
 
@@ -109,6 +128,7 @@ export default async (req: Request) => {
       success: true,
       message: "List parsed.",
       items: groceryItems,
+      model: modelUsed,
     });
   } catch (err) {
     console.error(err);

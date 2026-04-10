@@ -80,7 +80,11 @@ function InputPage() {
           success?: boolean;
           error?: string;
           items?: unknown;
+          model?: string;
         };
+        if (payloadJson.model && payloadJson.model !== "gemini-2.5-flash") {
+          logPipeline(`⚠️ gemini-2.5-flash unavailable — retried with ${payloadJson.model}.`);
+        }
         if (!response.ok || payloadJson.success === false) {
           logPipeline(`Gemini step failed: ${payloadJson.error ?? "unknown error"}.`);
           setLastAdded(null);
