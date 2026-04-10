@@ -23,7 +23,7 @@ function groupByCategory(rows: GroceryItem[]): Map<string, GroceryItem[]> {
 }
 
 function ListPage() {
-  const { items, updateList, isSyncing } = useGroceryList();
+  const { items, updateList } = useGroceryList();
   const [exitingIds, setExitingIds] = useState<Set<string>>(() => new Set());
 
   const visible = useMemo(() => {
@@ -57,11 +57,6 @@ function ListPage() {
 
   return (
     <main className="page page--list">
-      <h1 className="page__title">Lista</h1>
-      {isSyncing ? (
-        <p className="page__hint">Syncing…</p>
-      ) : null}
-
       {categories.length === 0 ? (
         <p className="page__empty">lista pusta</p>
       ) : (
@@ -78,9 +73,7 @@ function ListPage() {
                       <li
                         key={row.id}
                         className={
-                          exiting
-                            ? "list__row list__row--exit"
-                            : "list__row"
+                          exiting ? "list__row list__row--exit" : "list__row"
                         }
                       >
                         <span className="list__name">{row.item}</span>

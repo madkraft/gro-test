@@ -11,7 +11,6 @@ export function useGroceryList(): {
   items: GroceryItem[];
   updateList: (next: GroceryItem[]) => void;
   isOnline: boolean;
-  isSyncing: boolean;
 } {
   const isOnline = useOnlineStatus();
   const queryClient = useQueryClient();
@@ -63,6 +62,5 @@ export function useGroceryList(): {
     items,
     updateList,
     isOnline,
-    isSyncing: isOnline ? query.isFetching : false,
   };
 }

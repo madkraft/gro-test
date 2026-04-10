@@ -5,7 +5,7 @@
   --border: #d4cfc4;
   --font: "DM Mono", ui-monospace, monospace;
   font-family: var(--font);
-  font-size: 0.875rem;
+  font-size: 1rem;
   line-height: 1.45;
   color: var(--fg);
   background: var(--bg);
@@ -38,13 +38,30 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.5rem;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
   padding-bottom: 1rem;
   margin-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.shell__nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.shell__nav-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-left: auto;
 }
 
 .shell__link {
@@ -69,8 +86,15 @@ body {
   user-select: none;
 }
 
+.shell__sync {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .shell__offline {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -91,6 +115,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  margin-top: 2rem;
 }
 
 .page__title {

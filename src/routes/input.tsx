@@ -1,10 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  useCallback,
-  useRef,
-  useState,
-  type SubmitEvent,
-} from "react";
+import { useCallback, useRef, useState, type SubmitEvent } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
 import { getItems } from "../lib/storage";
 import type { GroceryItem } from "../types/grocery";
@@ -51,7 +46,7 @@ export const Route = createFileRoute("/input")({
 });
 
 function InputPage() {
-  const { updateList, isOnline, isSyncing } = useGroceryList();
+  const { updateList, isOnline } = useGroceryList();
   const [status, setStatus] = useState("");
   const [lastAdded, setLastAdded] = useState<AiRow[] | null>(null);
   const [listText, setListText] = useState("");
@@ -64,7 +59,10 @@ function InputPage() {
   const animationFrameRef = useRef<number | null>(null);
 
   const submitPayload = useCallback(
-    async (payload: { audioData?: string; text?: string }): Promise<boolean> => {
+    async (payload: {
+      audioData?: string;
+      text?: string;
+    }): Promise<boolean> => {
       setStatus("Processing list…");
       try {
         const response = await fetch(PROCESS_AUDIO_PATH, {
@@ -231,12 +229,7 @@ function InputPage() {
     : "mleko, chleb, pomidory…";
 
   return (
-    <main className="page page--input">
-      <h1 className="page__title">Say or type what we need to buy</h1>
-      {isSyncing ? (
-        <p className="page__hint">Syncing list…</p>
-      ) : null}
-
+    <main className="page">
       <form className="page__form" onSubmit={handleTypedSubmit}>
         <label className="page__label" htmlFor="grocery-text">
           Type your list
