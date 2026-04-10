@@ -1,10 +1,11 @@
 /// <reference lib="webworker" />
 import { env, pipeline } from "@huggingface/transformers";
+import { WHISPER_MODEL_ID } from "../lib/whisper-config";
 
 // Always fetch from the Hugging Face Hub (cached by the browser after first load)
 env.allowLocalModels = false;
 
-const MODEL_ID = "onnx-community/whisper-tiny";
+const MODEL_ID = WHISPER_MODEL_ID;
 
 type IncomingMessage =
   | { type: "load" }
@@ -12,7 +13,13 @@ type IncomingMessage =
 
 type OutgoingMessage =
   | { type: "loading"; progress: number; text: string }
-  | { type: "ready" }
+  | {
+      type: "ready";
+      modelId: string;
+      dtype: string;
+      language: string;
+    }
+  | { type: "log"; message: string }
   | { type: "result"; text: string }
   | { type: "error"; message: string };
 
@@ -57,7 +64,12 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
     try {
       send({ type: "loading", progress: 0, text: "Starting model load…" });
       await loadModel();
-      send({ type: "ready" });
+      send({
+        type: "ready",
+        modelId: MODEL_ID,
+        dtype: "q4",
+        language: "polish",
+      });
     } catch (err) {
       send({
         type: "error",
@@ -73,6 +85,7 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
       return;
     }
     try {
+      send({ type: "log", message: "Transcribing in browser (Whisper)…" });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       const result = (await transcriber(msg.audio, {
         task: "transcribe",
@@ -83,7 +96,12 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
       const text = Array.isArray(result)
         ? (result[0]?.text ?? "")
         : (result?.text ?? "");
-      send({ type: "result", text: text.trim() });
+      const trimmed = text.trim();
+      send({
+        type: "log",
+        message: `Transcription done (${trimmed.length} chars).`,
+      });
+      send({ type: "result", text: trimmed });
     } catch (err) {
       send({
         type: "error",

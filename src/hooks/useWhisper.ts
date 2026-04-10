@@ -2,11 +2,28 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type WhisperState = "idle" | "loading" | "ready" | "error";
 
+export type WhisperModelInfo = {
+  modelId: string;
+  dtype: string;
+  language: string;
+};
+
 type WorkerResponse =
   | { type: "loading"; progress: number; text: string }
-  | { type: "ready" }
+  | {
+      type: "ready";
+      modelId: string;
+      dtype: string;
+      language: string;
+    }
+  | { type: "log"; message: string }
   | { type: "result"; text: string }
   | { type: "error"; message: string };
+
+export type UseWhisperOptions = {
+  /** Appends worker pipeline lines (transcribe steps, etc.). */
+  onLog?: (line: string) => void;
+};
 
 function createWorker() {
   return new Worker(
@@ -15,12 +32,16 @@ function createWorker() {
   );
 }
 
-export function useWhisper() {
+export function useWhisper(options?: UseWhisperOptions) {
+  const onLogRef = useRef(options?.onLog);
+  onLogRef.current = options?.onLog;
+
   const workerRef = useRef<Worker | null>(null);
   const [state, setState] = useState<WhisperState>("idle");
   const [loadText, setLoadText] = useState("");
   const [loadProgress, setLoadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
+  const [modelInfo, setModelInfo] = useState<WhisperModelInfo | null>(null);
   const resolveRef = useRef<((text: string) => void) | null>(null);
   const rejectRef = useRef<((err: Error) => void) | null>(null);
 
@@ -34,6 +55,7 @@ export function useWhisper() {
     setLoadProgress(0);
     setLoadText("Starting…");
     setErrorMessage("");
+    setModelInfo(null);
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const msg = event.data;
@@ -46,6 +68,13 @@ export function useWhisper() {
         setLoadText("");
         setLoadProgress(100);
         setErrorMessage("");
+        setModelInfo({
+          modelId: msg.modelId,
+          dtype: msg.dtype,
+          language: msg.language,
+        });
+      } else if (msg.type === "log") {
+        onLogRef.current?.(msg.message);
       } else if (msg.type === "result") {
         resolveRef.current?.(msg.text);
         resolveRef.current = null;
@@ -97,5 +126,13 @@ export function useWhisper() {
     [state],
   );
 
-  return { state, loadText, loadProgress, errorMessage, transcribe, retry: startWorker };
+  return {
+    state,
+    loadText,
+    loadProgress,
+    errorMessage,
+    modelInfo,
+    transcribe,
+    retry: startWorker,
+  };
 }

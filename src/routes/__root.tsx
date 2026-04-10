@@ -6,6 +6,18 @@ export const Route = createRootRoute({
   component: RootLayout,
 });
 
+async function hardReloadApp() {
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch {
+    /* still try reload */
+  }
+  window.location.reload();
+}
+
 function RootLayout() {
   const isOnline = useOnlineStatus();
   const isSyncing = useGrocerySyncing();
@@ -43,6 +55,14 @@ function RootLayout() {
               offline
             </span>
           )}
+          <button
+            type="button"
+            className="shell__link"
+            title="Unregister service worker, clear caches, reload (fixes stale PWA)"
+            onClick={() => void hardReloadApp()}
+          >
+            Hard reload
+          </button>
         </div>
       </header>
       <Outlet />

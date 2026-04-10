@@ -394,3 +394,66 @@ body {
 .list__dismiss:hover {
   color: var(--fg);
 }
+
+.page__model {
+  margin: 0;
+  font-size: 0.65rem;
+  line-height: 1.35;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  word-break: break-word;
+}
+
+.page__model-note {
+  font-style: italic;
+}
+
+.debug-log {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.65rem;
+  background: color-mix(in srgb, var(--bg) 92%, var(--border));
+}
+
+.debug-log__summary {
+  cursor: pointer;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.debug-log__summary:hover {
+  color: var(--fg);
+}
+
+.debug-log__toolbar {
+  margin: 0.4rem 0 0.25rem;
+}
+
+.debug-log__clear {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+
+.debug-log__clear:hover {
+  border-color: var(--fg);
+}
+
+.debug-log__pre {
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
