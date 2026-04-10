@@ -21,13 +21,6 @@ export function getItems(): GroceryItem[] {
   }
 }
 
-export function setItems(items: GroceryItem[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
 function isGroceryItem(value: unknown): value is GroceryItem {
   if (value === null || typeof value !== "object") {
     return false;

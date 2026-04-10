@@ -1,11 +1,11 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { fetchGroceryItems, postGroceryItems } from "../lib/grocery-api";
-import { getItems, mergeItems, setItems } from "../lib/storage";
+import { getItems, mergeItems } from "../lib/storage";
 import type { GroceryItem } from "../types/grocery";
 import { useOnlineStatus } from "./useOnlineStatus";
 
-const QUERY_KEY = ["grocery-items"] as const;
+export const GROCERY_QUERY_KEY = ["grocery-items"] as const;
 
 export function useGroceryList(): {
   items: GroceryItem[];
@@ -16,12 +16,12 @@ export function useGroceryList(): {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: QUERY_KEY,
+    queryKey: GROCERY_QUERY_KEY,
     queryFn: async () => {
       const server = await fetchGroceryItems();
-      const local = getItems();
-      const merged = mergeItems(local, server);
-      setItems(merged);
+      const cached =
+        queryClient.getQueryData<GroceryItem[]>(GROCERY_QUERY_KEY) ?? [];
+      const merged = mergeItems(cached, server);
       if (JSON.stringify(merged) !== JSON.stringify(server)) {
         try {
           await postGroceryItems(merged);
@@ -31,35 +31,39 @@ export function useGroceryList(): {
       }
       return merged;
     },
-    initialData: getItems(),
-    enabled: isOnline,
+    // One-time migration: seed the cache from the old localStorage key if
+    // TanStack's own persisted cache is empty (e.g. first run after upgrade).
+    initialData: getItems,
   });
 
-  useEffect(() => {
-    const onOnline = () => {
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-    };
-    window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
-  }, [queryClient]);
+  const mutation = useMutation({
+    mutationFn: postGroceryItems,
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey: GROCERY_QUERY_KEY });
+      const previous =
+        queryClient.getQueryData<GroceryItem[]>(GROCERY_QUERY_KEY);
+      queryClient.setQueryData(GROCERY_QUERY_KEY, next);
+      return { previous };
+    },
+    onError: (_err, _next, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(GROCERY_QUERY_KEY, context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: GROCERY_QUERY_KEY });
+    },
+  });
 
   const updateList = useCallback(
     (next: GroceryItem[]) => {
-      setItems(next);
-      queryClient.setQueryData(QUERY_KEY, next);
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        void postGroceryItems(next).catch((e) => {
-          console.warn("Cloud sync failed:", e);
-        });
-      }
+      mutation.mutate(next);
     },
-    [queryClient],
+    [mutation],
   );
 
-  const items = isOnline ? (query.data ?? getItems()) : getItems();
-
   return {
-    items,
+    items: query.data ?? [],
     updateList,
     isOnline,
   };

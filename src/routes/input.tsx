@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState, type SubmitEvent } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
 import { useWhisper } from "../hooks/useWhisper";
-import { getItems } from "../lib/storage";
 import type { GroceryItem } from "../types/grocery";
 
 const PROCESS_AUDIO_PATH = "/.netlify/functions/process-audio";
@@ -64,7 +63,7 @@ export const Route = createFileRoute("/input")({
 });
 
 function InputPage() {
-  const { updateList, isOnline } = useGroceryList();
+  const { items, updateList, isOnline } = useGroceryList();
   const whisper = useWhisper();
 
   const [status, setStatus] = useState("");
@@ -112,7 +111,7 @@ function InputPage() {
         const newItems = rowsToItems(nextRows);
         setLastAdded(nextRows.length > 0 ? nextRows : null);
         if (newItems.length > 0) {
-          updateList([...getItems(), ...newItems]);
+          updateList([...items, ...newItems]);
         }
         setStatus(
           newItems.length > 0
@@ -128,15 +127,15 @@ function InputPage() {
         return false;
       }
     },
-    [isOnline, updateList],
+    [isOnline, items, updateList],
   );
 
-  /** Save items straight to local storage (offline fallback after transcription). */
+  /** Offline fallback after transcription: save without AI categorisation. */
   const saveOffline = useCallback(
     (rows: AiRow[]) => {
       const newItems = rowsToItems(rows);
       if (newItems.length > 0) {
-        updateList([...getItems(), ...newItems]);
+        updateList([...items, ...newItems]);
         setLastAdded(rows);
         setStatus("Saved locally without categories. Will sync when online.");
       } else {
@@ -144,7 +143,7 @@ function InputPage() {
         setStatus("Nothing recognised.");
       }
     },
-    [updateList],
+    [items, updateList],
   );
 
   const stopRecording = useCallback(() => {
