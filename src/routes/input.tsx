@@ -1,30 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState, type SubmitEvent } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
+import { useWhisper } from "../hooks/useWhisper";
 import { getItems } from "../lib/storage";
 import type { GroceryItem } from "../types/grocery";
 
 const PROCESS_AUDIO_PATH = "/.netlify/functions/process-audio";
+const TARGET_SAMPLE_RATE = 16_000;
 
 type AiRow = { item: string; category?: string };
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("Unexpected FileReader result"));
-        return;
-      }
-      const comma = result.indexOf(",");
-      const base64 = comma >= 0 ? result.slice(comma + 1) : result;
-      resolve(base64);
-    };
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
-  });
+/**
+ * Decode a Blob of audio and resample it to a mono Float32Array at 16 kHz,
+ * which is the format Whisper expects.
+ */
+async function resampleAudio(blob: Blob): Promise<Float32Array> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const decodeCtx = new AudioContext();
+  const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
+  void decodeCtx.close();
+
+  const offlineCtx = new OfflineAudioContext(
+    1,
+    Math.ceil(decoded.duration * TARGET_SAMPLE_RATE),
+    TARGET_SAMPLE_RATE,
+  );
+  const source = offlineCtx.createBufferSource();
+  source.buffer = decoded;
+  source.connect(offlineCtx.destination);
+  source.start();
+  const resampled = await offlineCtx.startRendering();
+  return resampled.getChannelData(0);
+}
+
+/**
+ * Fallback: if we're offline after transcribing, split the raw text into
+ * items and add them all under "❓ Inne" without going through Gemini.
+ */
+function parseOfflineTranscript(transcript: string): AiRow[] {
+  return transcript
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((item) => ({ item }));
 }
 
 function rowsToItems(rows: AiRow[]): GroceryItem[] {
@@ -47,9 +65,12 @@ export const Route = createFileRoute("/input")({
 
 function InputPage() {
   const { updateList, isOnline } = useGroceryList();
+  const whisper = useWhisper();
+
   const [status, setStatus] = useState("");
   const [lastAdded, setLastAdded] = useState<AiRow[] | null>(null);
   const [listText, setListText] = useState("");
+
   const holdingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -58,17 +79,15 @@ function InputPage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const submitPayload = useCallback(
-    async (payload: {
-      audioData?: string;
-      text?: string;
-    }): Promise<boolean> => {
+  /** Send a text string to the Gemini Netlify function for categorisation. */
+  const submitText = useCallback(
+    async (text: string): Promise<boolean> => {
       setStatus("Processing list…");
       try {
         const response = await fetch(PROCESS_AUDIO_PATH, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ text }),
         });
         const payloadJson = (await response.json()) as {
           success?: boolean;
@@ -112,6 +131,22 @@ function InputPage() {
     [isOnline, updateList],
   );
 
+  /** Save items straight to local storage (offline fallback after transcription). */
+  const saveOffline = useCallback(
+    (rows: AiRow[]) => {
+      const newItems = rowsToItems(rows);
+      if (newItems.length > 0) {
+        updateList([...getItems(), ...newItems]);
+        setLastAdded(rows);
+        setStatus("Saved locally without categories. Will sync when online.");
+      } else {
+        setLastAdded(null);
+        setStatus("Nothing recognised.");
+      }
+    },
+    [updateList],
+  );
+
   const stopRecording = useCallback(() => {
     holdingRef.current = false;
     const mr = mediaRecorderRef.current;
@@ -121,11 +156,11 @@ function InputPage() {
   }, []);
 
   const startRecording = useCallback(async () => {
-    if (!isOnline) {
-      return;
-    }
+    if (whisper.state !== "ready") return;
+
     holdingRef.current = true;
     setStatus("Requesting microphone…");
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!holdingRef.current) {
@@ -195,8 +230,28 @@ function InputPage() {
           return;
         }
 
-        const audioData = await blobToBase64(audioBlob);
-        await submitPayload({ audioData });
+        // Step 1: transcribe locally (works offline after model is cached)
+        setStatus("Transcribing…");
+        let transcript: string;
+        try {
+          const audio = await resampleAudio(audioBlob);
+          transcript = await whisper.transcribe(audio);
+        } catch {
+          setStatus("Transcription failed. Try again.");
+          return;
+        }
+
+        if (!transcript.trim()) {
+          setStatus("Couldn't make out any words. Try again.");
+          return;
+        }
+
+        // Step 2: categorise via Gemini (needs internet)
+        if (!isOnline) {
+          saveOffline(parseOfflineTranscript(transcript));
+          return;
+        }
+        await submitText(transcript);
       };
 
       mediaRecorder.start();
@@ -204,25 +259,25 @@ function InputPage() {
     } catch {
       setStatus("Microphone access denied or unavailable.");
     }
-  }, [isOnline, submitPayload]);
+  }, [whisper, isOnline, submitText, saveOffline]);
 
   const handleTypedSubmit = (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!isOnline) {
-      return;
-    }
+    if (!isOnline) return;
     const trimmed = listText.trim();
     if (trimmed.length === 0) {
       setStatus("Type a list first.");
       return;
     }
     void (async () => {
-      const ok = await submitPayload({ text: trimmed });
-      if (ok) {
-        setListText("");
-      }
+      const ok = await submitText(trimmed);
+      if (ok) setListText("");
     })();
   };
+
+  const modelLoading = whisper.state === "loading";
+  const modelError = whisper.state === "error";
+  const showPanel = modelLoading || modelError;
 
   const offlineHint = !isOnline
     ? "Reconnect to add items with AI."
@@ -250,33 +305,80 @@ function InputPage() {
 
       <p className="page__divider">or hold to speak</p>
 
-      <button
-        type="button"
-        className={
-          isOnline ? "page__record" : "page__record page__record--disabled"
-        }
-        disabled={!isOnline}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          void startRecording();
-        }}
-        onPointerUp={(e) => {
-          e.preventDefault();
-          stopRecording();
-        }}
-        onPointerLeave={() => {
-          stopRecording();
-        }}
-      >
-        {isOnline ? "Hold to Speak" : "AI unavailable offline"}
-      </button>
+      {showPanel ? (
+        <div
+          className={
+            modelError
+              ? "model-loader model-loader--error"
+              : "model-loader"
+          }
+          role="status"
+          aria-live="polite"
+        >
+          {modelError ? (
+            <>
+              <p className="model-loader__title">Voice model failed to load</p>
+              <p className="model-loader__error">{whisper.errorMessage}</p>
+              <button
+                type="button"
+                className="model-loader__retry"
+                onClick={whisper.retry}
+              >
+                Try again
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="model-loader__title">Downloading voice model</p>
+              <p className="model-loader__body">
+                Loading a tiny AI speech model (~45 MB) directly into your
+                browser. Once cached, voice recognition works offline — no
+                server involved.
+              </p>
+              <div className="model-loader__track">
+                <div
+                  className="model-loader__bar"
+                  style={{ width: `${whisper.loadProgress}%` }}
+                />
+              </div>
+              <p className="model-loader__note">
+                One-time download · {Math.round(whisper.loadProgress)}% complete
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="page__record"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            void startRecording();
+          }}
+          onPointerUp={(e) => {
+            e.preventDefault();
+            stopRecording();
+          }}
+          onPointerLeave={() => {
+            stopRecording();
+          }}
+        >
+          Hold to Speak
+        </button>
+      )}
+
       {status ? (
         <p className="page__status">{status}</p>
       ) : (
         <p className="page__status page__status--muted">
-          {isOnline ? "Ready" : "List works offline; AI needs connection."}
+          {modelLoading
+            ? "Voice will be ready when the download finishes."
+            : isOnline
+              ? "Ready"
+              : "Voice works offline; categories need connection."}
         </p>
       )}
+
       {lastAdded ? (
         <ul className="page__preview">
           {lastAdded.map((row, i) => (
