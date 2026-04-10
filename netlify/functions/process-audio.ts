@@ -7,7 +7,12 @@ import {
 } from "@google/genai";
 
 const GEMINI_PRIMARY_MODEL = "gemini-2.5-flash";
-const GEMINI_FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash-lite"] as const;
+const GEMINI_FALLBACK_MODELS = [
+  "gemini-2.5-flash-lite", // Primary: The absolute cheapest, fastest stable model
+  "gemini-3.1-flash-lite-preview", // Backup 1: The next-gen cheap model
+  "gemini-3.1-flash-lite-preview", // The absolute fastest, lowest-latency model for simple text/audio
+  "gemini-3-flash-preview", // The newest stable generation
+];
 
 type GroceryItem = { item: string; category: string };
 
@@ -101,8 +106,15 @@ export default async (req: Request) => {
     const tryGenerate = (model: string) =>
       ai.models.generateContent({ model, config: generateConfig, contents });
 
-    const isUnavailable = (err: unknown) =>
-      err instanceof ApiError && err.status === 503;
+    const isUnavailable = (err: unknown) => {
+      const unavailable =
+        err instanceof ApiError &&
+        [503, 404, 500].includes(err.status as number);
+      if (unavailable) {
+        console.warn(`[process-audio] Model unavailable (status ${(err as ApiError).status}):`, err);
+      }
+      return unavailable;
+    };
 
     let modelUsed = GEMINI_PRIMARY_MODEL;
     let response = await tryGenerate(GEMINI_PRIMARY_MODEL).catch(
