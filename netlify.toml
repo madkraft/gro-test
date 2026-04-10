@@ -2,6 +2,12 @@
   command = "pnpm run build"
   publish = "dist"
 
+# Client-side routes (/input, /list) on refresh
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

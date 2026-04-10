@@ -1,9 +1,17 @@
-import { useCallback, useRef, useState, type FormEvent } from "react";
-import "./App.css";
+import { createFileRoute } from "@tanstack/react-router";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type SubmitEvent,
+} from "react";
+import { useGroceryList } from "../hooks/useGroceryList";
+import { getItems } from "../lib/storage";
+import type { GroceryItem } from "../types/grocery";
 
 const PROCESS_AUDIO_PATH = "/.netlify/functions/process-audio";
 
-type GroceryItem = { item: string; category?: string };
+type AiRow = { item: string; category?: string };
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -24,9 +32,28 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-export default function App() {
+function rowsToItems(rows: AiRow[]): GroceryItem[] {
+  const now = new Date().toISOString();
+  return rows.map((row) => ({
+    id: crypto.randomUUID(),
+    item: row.item,
+    category:
+      typeof row.category === "string" && row.category.trim() !== ""
+        ? row.category
+        : "❓ Inne",
+    bought: false,
+    createdAt: now,
+  }));
+}
+
+export const Route = createFileRoute("/input")({
+  component: InputPage,
+});
+
+function InputPage() {
+  const { updateList, isOnline, isSyncing } = useGroceryList();
   const [status, setStatus] = useState("");
-  const [items, setItems] = useState<GroceryItem[] | null>(null);
+  const [lastAdded, setLastAdded] = useState<AiRow[] | null>(null);
   const [listText, setListText] = useState("");
   const holdingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -51,30 +78,40 @@ export default function App() {
           items?: unknown;
         };
         if (!response.ok || payloadJson.success === false) {
-          setItems(null);
-          setStatus(payloadJson.error ?? "Error saving list.");
+          setLastAdded(null);
+          setStatus(payloadJson.error ?? "Error parsing list.");
           return false;
         }
         const raw = payloadJson.items;
-        const nextItems = Array.isArray(raw)
+        const nextRows = Array.isArray(raw)
           ? raw.filter(
-              (row): row is GroceryItem =>
+              (row): row is AiRow =>
                 row !== null &&
                 typeof row === "object" &&
                 "item" in row &&
-                typeof (row as GroceryItem).item === "string",
+                typeof (row as AiRow).item === "string",
             )
           : [];
-        setItems(nextItems.length > 0 ? nextItems : null);
-        setStatus("Added to Notion!");
-        return true;
+        const newItems = rowsToItems(nextRows);
+        setLastAdded(nextRows.length > 0 ? nextRows : null);
+        if (newItems.length > 0) {
+          updateList([...getItems(), ...newItems]);
+        }
+        setStatus(
+          newItems.length > 0
+            ? isOnline
+              ? "Saved and synced."
+              : "Saved locally. Will sync when online."
+            : "No items found.",
+        );
+        return newItems.length > 0;
       } catch {
-        setItems(null);
-        setStatus("Error saving list.");
+        setLastAdded(null);
+        setStatus("Error parsing list.");
         return false;
       }
     },
-    [],
+    [isOnline, updateList],
   );
 
   const stopRecording = useCallback(() => {
@@ -86,6 +123,9 @@ export default function App() {
   }, []);
 
   const startRecording = useCallback(async () => {
+    if (!isOnline) {
+      return;
+    }
     holdingRef.current = true;
     setStatus("Requesting microphone…");
     try {
@@ -166,10 +206,13 @@ export default function App() {
     } catch {
       setStatus("Microphone access denied or unavailable.");
     }
-  }, [submitPayload]);
+  }, [isOnline, submitPayload]);
 
-  const handleTypedSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleTypedSubmit = (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!isOnline) {
+      return;
+    }
     const trimmed = listText.trim();
     if (trimmed.length === 0) {
       setStatus("Type a list first.");
@@ -183,32 +226,43 @@ export default function App() {
     })();
   };
 
-  return (
-    <main className="app">
-      <h1 className="app__title">Say or type what we need to buy 🛒</h1>
+  const offlineHint = !isOnline
+    ? "Reconnect to add items with AI."
+    : "mleko, chleb, pomidory…";
 
-      <form className="app__form" onSubmit={handleTypedSubmit}>
-        <label className="app__label" htmlFor="grocery-text">
-          Or type your list
+  return (
+    <main className="page page--input">
+      <h1 className="page__title">Say or type what we need to buy</h1>
+      {isSyncing ? (
+        <p className="page__hint">Syncing list…</p>
+      ) : null}
+
+      <form className="page__form" onSubmit={handleTypedSubmit}>
+        <label className="page__label" htmlFor="grocery-text">
+          Type your list
         </label>
         <textarea
           id="grocery-text"
-          className="app__textarea"
+          className="page__textarea"
           rows={4}
           value={listText}
           onChange={(e) => setListText(e.target.value)}
-          placeholder="mleko, chleb, pomidory…"
+          placeholder={offlineHint}
+          disabled={!isOnline}
         />
-        <button type="submit" className="app__submit">
+        <button type="submit" className="page__submit" disabled={!isOnline}>
           Send to list
         </button>
       </form>
 
-      <p className="app__divider">or hold to speak</p>
+      <p className="page__divider">or hold to speak</p>
 
       <button
         type="button"
-        className="app__record"
+        className={
+          isOnline ? "page__record" : "page__record page__record--disabled"
+        }
+        disabled={!isOnline}
         onPointerDown={(e) => {
           e.preventDefault();
           void startRecording();
@@ -221,20 +275,22 @@ export default function App() {
           stopRecording();
         }}
       >
-        Hold to Speak
+        {isOnline ? "Hold to Speak" : "AI unavailable offline"}
       </button>
       {status ? (
-        <p className="app__status">{status}</p>
+        <p className="page__status">{status}</p>
       ) : (
-        <p className="app__status">Ready to listen</p>
+        <p className="page__status page__status--muted">
+          {isOnline ? "Ready" : "List works offline; AI needs connection."}
+        </p>
       )}
-      {items ? (
-        <ul className="app__items">
-          {items.map((row, i) => (
-            <li key={`${row.item}-${i}`} className="app__item">
-              <span className="app__item-name">{row.item}</span>
+      {lastAdded ? (
+        <ul className="page__preview">
+          {lastAdded.map((row, i) => (
+            <li key={`${row.item}-${i}`} className="page__preview-row">
+              <span className="page__preview-name">{row.item}</span>
               {row.category ? (
-                <span className="app__item-category"> — {row.category}</span>
+                <span className="page__preview-cat"> — {row.category}</span>
               ) : null}
             </li>
           ))}

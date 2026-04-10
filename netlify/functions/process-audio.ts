@@ -4,10 +4,7 @@ import {
   createPartFromBase64,
   createUserContent,
 } from "@google/genai";
-import { Client } from "@notionhq/client";
 import type { Handler } from "@netlify/functions";
-
-const databaseId = process.env.NOTION_DATABASE_ID;
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
@@ -52,18 +49,6 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         success: false,
         error: "Missing GEMINI_API_KEY.",
-      }),
-    };
-  }
-
-  const notionApiKey = process.env.NOTION_API_KEY;
-  if (!notionApiKey || !databaseId) {
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        success: false,
-        error: "Missing NOTION_API_KEY or NOTION_DATABASE_ID.",
       }),
     };
   }
@@ -153,34 +138,12 @@ ${OUTPUT_JSON_INSTRUCTIONS}`,
       };
     }
 
-    const notionClient = new Client({ auth: notionApiKey });
-
-    for (const item of groceryItems) {
-      const name = typeof item.item === "string" ? item.item : "";
-      const category =
-        typeof item.category === "string" && item.category.trim() !== ""
-          ? item.category
-          : "❓ Inne";
-
-      await notionClient.pages.create({
-        parent: { database_id: databaseId },
-        properties: {
-          Name: {
-            title: [{ text: { content: name } }],
-          },
-          Category: {
-            select: { name: category },
-          },
-        },
-      });
-    }
-
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         success: true,
-        message: "Added to Notion!",
+        message: "List parsed.",
         items: groceryItems,
       }),
     };
@@ -191,7 +154,7 @@ ${OUTPUT_JSON_INSTRUCTIONS}`,
         ? err.message
         : err instanceof Error
           ? err.message
-          : "Failed to process input or save to Notion.";
+          : "Failed to process input.";
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
