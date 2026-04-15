@@ -262,12 +262,22 @@ function InputPage() {
       logPipeline("Typed submit: sending to Gemini.");
       const rows = await submitToGemini({ text: trimmed });
       if (rows) {
-        const newItems = rowsToItems(rows);
-        logPipeline(`Merging ${String(newItems.length)} item(s) into list…`);
-        updateList([...items, ...newItems]);
-        logPipeline("List saved (local + sync when online).");
-        setListText("");
-        setStatus(isOnline ? "Saved and synced." : "Saved locally. Will sync when online.");
+        const existingNames = new Set(items.map((i) => i.item.toLowerCase()));
+        const dedupedRows = rows.filter((r) => !existingNames.has(r.item.toLowerCase()));
+        const skipped = rows.length - dedupedRows.length;
+        if (skipped > 0) {
+          logPipeline(`Skipped ${String(skipped)} duplicate(s).`);
+        }
+        const newItems = rowsToItems(dedupedRows);
+        if (newItems.length > 0) {
+          logPipeline(`Merging ${String(newItems.length)} item(s) into list…`);
+          updateList([...items, ...newItems]);
+          logPipeline("List saved (local + sync when online).");
+          setListText("");
+          setStatus(isOnline ? "Saved and synced." : "Saved locally. Will sync when online.");
+        } else {
+          setStatus("All items already in the list.");
+        }
       } else {
         setStatus((s) => s || "No items found.");
       }
