@@ -57,10 +57,33 @@ function InputPage() {
   const [listText, setListText] = useState(
     () => sessionStorage.getItem("input-draft") ?? "",
   );
+  const [micEnabled, setMicEnabled] = useState(
+    () => localStorage.getItem("mic-enabled") === "true",
+  );
 
   useEffect(() => {
     sessionStorage.setItem("input-draft", listText);
   }, [listText]);
+
+  useEffect(() => {
+    if (!navigator.permissions) return;
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((result) => {
+        if (result.state === "denied") {
+          localStorage.removeItem("mic-enabled");
+          setMicEnabled(false);
+        }
+        result.onchange = () => {
+          if (result.state === "denied") {
+            localStorage.removeItem("mic-enabled");
+            setMicEnabled(false);
+          }
+        };
+      })
+      .catch(() => {});
+  }, []);
+
   const [isRecording, setIsRecording] = useState(false);
 
   const holdingRef = useRef(false);
@@ -119,6 +142,20 @@ function InputPage() {
     },
     [logPipeline],
   );
+
+  const enableMic = useCallback(async () => {
+    logPipeline("Microphone: requesting permission…");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      localStorage.setItem("mic-enabled", "true");
+      setMicEnabled(true);
+      logPipeline("Microphone: permission granted.");
+    } catch {
+      logPipeline("Microphone: denied or unavailable.");
+      setStatus("Microphone access denied.");
+    }
+  }, [logPipeline]);
 
   const stopRecording = useCallback(() => {
     holdingRef.current = false;
@@ -251,8 +288,10 @@ function InputPage() {
       setStatus("Listening…");
     } catch {
       setIsRecording(false);
+      localStorage.removeItem("mic-enabled");
+      setMicEnabled(false);
       logPipeline("Microphone: denied or unavailable.");
-      setStatus("Microphone access denied or unavailable.");
+      setStatus("Microphone access denied — tap Enable Mic to retry.");
     }
   }, [isOnline, logPipeline, submitToGemini]);
 
@@ -322,30 +361,41 @@ function InputPage() {
         </button>
       </form>
 
-      <p className="page__divider">or hold to speak</p>
+      <p className="page__divider">or</p>
 
-      <button
-        type="button"
-        className={`page__record${isRecording ? " page__record--active" : ""}`}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          const ta = textareaRef.current;
-          insertSnapshotRef.current = ta
-            ? { text: ta.value, pos: ta.selectionStart }
-            : null;
-          void startRecording();
-        }}
-        onPointerUp={(e) => {
-          e.preventDefault();
-          stopRecording();
-        }}
-        onPointerLeave={() => {
-          stopRecording();
-        }}
-        disabled={!isOnline}
-      >
-        {isRecording ? "Listening…" : "Hold to Speak"}
-      </button>
+      {micEnabled ? (
+        <button
+          type="button"
+          className={`page__record${isRecording ? " page__record--active" : ""}`}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            const ta = textareaRef.current;
+            insertSnapshotRef.current = ta
+              ? { text: ta.value, pos: ta.selectionStart }
+              : null;
+            void startRecording();
+          }}
+          onPointerUp={(e) => {
+            e.preventDefault();
+            stopRecording();
+          }}
+          onPointerLeave={() => {
+            stopRecording();
+          }}
+          disabled={!isOnline}
+        >
+          {isRecording ? "Listening…" : "Hold to Speak"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="page__enable-mic"
+          onClick={() => void enableMic()}
+          disabled={!isOnline}
+        >
+          Enable Mic
+        </button>
+      )}
 
       {status ? (
         <p className="page__status">{status}</p>

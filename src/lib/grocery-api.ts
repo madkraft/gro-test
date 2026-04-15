@@ -1,8 +1,12 @@
 import type { GroceryItem } from "../types/grocery";
+import { MOCK_ITEMS } from "./mock-items";
 
 const GROCERY_ITEMS_PATH = "/.netlify/functions/grocery-items";
 
 export async function fetchGroceryItems(): Promise<GroceryItem[]> {
+  if (import.meta.env.DEV) {
+    return structuredClone(MOCK_ITEMS);
+  }
   const response = await fetch(GROCERY_ITEMS_PATH, {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -19,6 +23,9 @@ export async function fetchGroceryItems(): Promise<GroceryItem[]> {
 }
 
 export async function postGroceryItems(items: GroceryItem[]): Promise<void> {
+  if (import.meta.env.DEV) {
+    return;
+  }
   const response = await fetch(GROCERY_ITEMS_PATH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

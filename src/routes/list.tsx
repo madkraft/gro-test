@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
+import { CATEGORIES } from "../types/grocery";
 import type { GroceryItem } from "../types/grocery";
 
 export const Route = createFileRoute("/list")({
@@ -21,9 +22,16 @@ function groupByCategory(rows: GroceryItem[]): Map<string, GroceryItem[]> {
   return map;
 }
 
+type EditState = {
+  id: string;
+  item: string;
+  category: string;
+};
+
 function ListPage() {
   const { items, updateList } = useGroceryList();
   const [exitingIds, setExitingIds] = useState<Set<string>>(() => new Set());
+  const [editing, setEditing] = useState<EditState | null>(null);
 
   const visible = useMemo(() => {
     return items.filter((i) => !i.bought || exitingIds.has(i.id));
@@ -54,6 +62,27 @@ function ListPage() {
     }, 280);
   };
 
+  const handleEditStart = (row: GroceryItem) => {
+    setEditing({ id: row.id, item: row.item, category: row.category });
+  };
+
+  const handleEditSave = () => {
+    if (!editing) return;
+    const trimmed = editing.item.trim();
+    if (!trimmed) return;
+    const updated = items.map((i) =>
+      i.id === editing.id
+        ? { ...i, item: trimmed, category: editing.category }
+        : i,
+    );
+    updateList(updated);
+    setEditing(null);
+  };
+
+  const handleEditCancel = () => {
+    setEditing(null);
+  };
+
   return (
     <main className="page page--list">
       {categories.length === 0 ? (
@@ -68,22 +97,96 @@ function ListPage() {
                 <ul className="list__ul">
                   {rows.map((row) => {
                     const exiting = exitingIds.has(row.id);
+                    const isEditing = editing?.id === row.id;
                     return (
                       <li
                         key={row.id}
                         className={
-                          exiting ? "list__row list__row--exit" : "list__row"
+                          exiting
+                            ? "list__row list__row--exit"
+                            : isEditing
+                              ? "list__row list__row--editing"
+                              : "list__row"
                         }
                       >
-                        <span className="list__name">{row.item}</span>
-                        <button
-                          type="button"
-                          className="list__dismiss"
-                          aria-label={`Mark ${row.item} bought`}
-                          onClick={() => handleMarkBought(row.id)}
-                        >
-                          [×]
-                        </button>
+                        {isEditing ? (
+                          <div className="list__edit-form">
+                            <input
+                              className="list__edit-input"
+                              value={editing.item}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, item: e.target.value } : prev,
+                                )
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleEditSave();
+                                if (e.key === "Escape") handleEditCancel();
+                              }}
+                              autoFocus
+                            />
+                            <div className="list__edit-row">
+                              <select
+                                className="list__edit-select"
+                                value={editing.category}
+                                onChange={(e) =>
+                                  setEditing((prev) =>
+                                    prev
+                                      ? { ...prev, category: e.target.value }
+                                      : prev,
+                                  )
+                                }
+                              >
+                                {CATEGORIES.map((c) => (
+                                  <option key={c} value={c}>
+                                    {c}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="list__edit-actions">
+                                <button
+                                  type="button"
+                                  className="list__edit-btn"
+                                  onClick={handleEditSave}
+                                  aria-label="Save"
+                                >
+                                  [✓]
+                                </button>
+                                <button
+                                  type="button"
+                                  className="list__edit-btn"
+                                  onClick={handleEditCancel}
+                                  aria-label="Cancel"
+                                >
+                                  [×]
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <span
+                              className="list__name list__name--editable"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleEditStart(row)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ")
+                                  handleEditStart(row);
+                              }}
+                            >
+                              {row.item}
+                            </span>
+                            <button
+                              type="button"
+                              className="list__dismiss"
+                              aria-label={`Mark ${row.item} bought`}
+                              onClick={() => handleMarkBought(row.id)}
+                            >
+                              [×]
+                            </button>
+                          </>
+                        )}
                       </li>
                     );
                   })}

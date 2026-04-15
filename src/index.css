@@ -190,6 +190,26 @@ body {
   text-transform: lowercase;
 }
 
+.page__enable-mic {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.page__enable-mic:hover {
+  border-color: var(--fg);
+}
+
+.page__enable-mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .page__record {
   width: 100%;
   height: 100px;
@@ -329,6 +349,77 @@ body {
 }
 
 .list__dismiss:hover {
+  color: var(--fg);
+}
+
+.list__name--editable {
+  cursor: pointer;
+}
+
+.list__name--editable:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.list__row--editing {
+  max-height: 7rem;
+  display: block;
+  padding: 0.45rem 0;
+}
+
+.list__edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.list__edit-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.list__edit-input {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.875rem;
+  border-radius: 0;
+}
+
+.list__edit-select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.75rem;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.list__edit-actions {
+  display: flex;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.list__edit-btn {
+  border: none;
+  background: none;
+  padding: 0.2rem 0.3rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.list__edit-btn:hover {
   color: var(--fg);
 }
 

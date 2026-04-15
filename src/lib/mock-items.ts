@@ -1,0 +1,81 @@
+import type { GroceryItem } from "../types/grocery";
+
+export const MOCK_ITEMS: GroceryItem[] = [
+  {
+    id: "mock-1",
+    item: "Chleb żytni",
+    category: "🥯 Piekarnia",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-2",
+    item: "Bułki grahamki",
+    category: "🥯 Piekarnia",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-3",
+    item: "Mleko 3.2%",
+    category: "🧊 Lodówka / mleczny",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-4",
+    item: "Jogurt naturalny",
+    category: "🧊 Lodówka / mleczny",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-5",
+    item: "Masło",
+    category: "🧊 Lodówka / mleczny",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-6",
+    item: "Jabłka",
+    category: "🍇 Owoce i warzywa",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-7",
+    item: "Pomidory",
+    category: "🍇 Owoce i warzywa",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-8",
+    item: "Pierś z kurczaka",
+    category: "🥩 Mięso",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-9",
+    item: "Sok pomarańczowy",
+    category: "🥤 Napoje",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-10",
+    item: "Sól",
+    category: "🍜 Sypane / przyprawy",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "mock-11",
+    item: "Pampersy",
+    category: "👶 Tadziu",
+    bought: false,
+    createdAt: new Date().toISOString(),
+  },
+];
