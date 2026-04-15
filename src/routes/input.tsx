@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState, type SubmitEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
 import type { GroceryItem } from "../types/grocery";
 
@@ -54,7 +54,13 @@ function InputPage() {
   }, []);
 
   const [status, setStatus] = useState("");
-  const [listText, setListText] = useState("");
+  const [listText, setListText] = useState(
+    () => sessionStorage.getItem("input-draft") ?? "",
+  );
+
+  useEffect(() => {
+    sessionStorage.setItem("input-draft", listText);
+  }, [listText]);
   const [isRecording, setIsRecording] = useState(false);
 
   const holdingRef = useRef(false);
