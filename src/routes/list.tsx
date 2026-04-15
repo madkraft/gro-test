@@ -40,7 +40,9 @@ function ListPage() {
   const grouped = useMemo(() => groupByCategory(visible), [visible]);
 
   const categories = useMemo(() => {
-    return Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b));
+    return Array.from(grouped.keys()).sort(
+      (a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b),
+    );
   }, [grouped]);
 
   const handleMarkBought = (id: string) => {

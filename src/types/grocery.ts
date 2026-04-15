@@ -8,12 +8,12 @@ export type GroceryItem = {
 
 export const CATEGORIES = [
   "🥯 Piekarnia",
-  "🥤 Napoje",
   "🍇 Owoce i warzywa",
-  "🧊 Lodówka / mleczny",
-  "🛒 Rossmann / apteka",
-  "🥩 Mięso",
   "🍜 Sypane / przyprawy",
+  "🧊 Lodówka / mleczny",
+  "🥩 Mięso",
+  "🛒 Rossmann / apteka",
+  "🥤 Napoje",
   "🏠 Dla domu",
   "👶 Tadziu",
   "🧒 Julcia",
