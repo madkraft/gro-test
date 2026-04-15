@@ -3,6 +3,8 @@ import { useCallback, useRef, useState, type SubmitEvent } from "react";
 import { useGroceryList } from "../hooks/useGroceryList";
 import type { GroceryItem } from "../types/grocery";
 
+type InsertSnapshot = { text: string; pos: number };
+
 const PROCESS_AUDIO_PATH = "/.netlify/functions/process-audio";
 
 type AiRow = { item: string; category?: string };
@@ -52,7 +54,6 @@ function InputPage() {
   }, []);
 
   const [status, setStatus] = useState("");
-  const [lastAdded, setLastAdded] = useState<AiRow[] | null>(null);
   const [listText, setListText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
 
@@ -63,9 +64,11 @@ function InputPage() {
   const hasSpokenRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const insertSnapshotRef = useRef<InsertSnapshot | null>(null);
 
   const submitToGemini = useCallback(
-    async (opts: { text?: string; audioData?: string; mimeType?: string }): Promise<boolean> => {
+    async (opts: { text?: string; audioData?: string; mimeType?: string }): Promise<AiRow[] | null> => {
       const isAudio = !!opts.audioData;
       logPipeline(isAudio ? "Sending audio to Gemini…" : "Sending text to Gemini…");
       setStatus("Processing…");
@@ -87,9 +90,8 @@ function InputPage() {
         }
         if (!response.ok || payloadJson.success === false) {
           logPipeline(`Gemini step failed: ${payloadJson.error ?? "unknown error"}.`);
-          setLastAdded(null);
           setStatus(payloadJson.error ?? "Error parsing list.");
-          return false;
+          return null;
         }
         const raw = payloadJson.items;
         const nextRows = Array.isArray(raw)
@@ -102,31 +104,14 @@ function InputPage() {
             )
           : [];
         logPipeline(`Parsed ${String(nextRows.length)} row(s) from API.`);
-        const newItems = rowsToItems(nextRows);
-        setLastAdded(nextRows.length > 0 ? nextRows : null);
-        if (newItems.length > 0) {
-          logPipeline(`Merging ${String(newItems.length)} item(s) into list…`);
-          updateList([...items, ...newItems]);
-          logPipeline("List saved (local + sync when online).");
-        } else {
-          logPipeline("No items to save.");
-        }
-        setStatus(
-          newItems.length > 0
-            ? isOnline
-              ? "Saved and synced."
-              : "Saved locally. Will sync when online."
-            : "No items found.",
-        );
-        return newItems.length > 0;
+        return nextRows.length > 0 ? nextRows : null;
       } catch {
         logPipeline("Request threw (network or parse error).");
-        setLastAdded(null);
         setStatus("Error parsing list.");
-        return false;
+        return null;
       }
     },
-    [isOnline, items, logPipeline, updateList],
+    [logPipeline],
   );
 
   const stopRecording = useCallback(() => {
@@ -227,10 +212,29 @@ function InputPage() {
         try {
           const audioData = await blobToBase64(audioBlob);
           logPipeline(`Audio ready (${String(Math.round(audioData.length / 1024))} KB base64).`);
-          await submitToGemini({
+          const rows = await submitToGemini({
             audioData,
             mimeType: audioBlob.type ?? "audio/webm",
           });
+
+          if (rows) {
+            const insertText = rows.map((r) => r.item).join("\n");
+            const snapshot = insertSnapshotRef.current;
+            setListText((prev) => {
+              const base = snapshot ? snapshot.text : prev;
+              const pos = snapshot ? snapshot.pos : base.length;
+              const before = base.slice(0, pos);
+              const after = base.slice(pos);
+              const prefix = before.length > 0 && !before.endsWith("\n") ? "\n" : "";
+              const suffix = after.length > 0 && !after.startsWith("\n") ? "\n" : "";
+              return before + prefix + insertText + suffix + after;
+            });
+            logPipeline(`Inserted ${String(rows.length)} item(s) into input.`);
+            setStatus("Added to input. Edit and send when ready.");
+            setTimeout(() => textareaRef.current?.focus(), 0);
+          } else {
+            setStatus((s) => s || "No items found.");
+          }
         } catch {
           logPipeline("Failed to encode or send audio.");
           setStatus("Failed to send audio. Try again.");
@@ -256,8 +260,17 @@ function InputPage() {
     }
     void (async () => {
       logPipeline("Typed submit: sending to Gemini.");
-      const ok = await submitToGemini({ text: trimmed });
-      if (ok) setListText("");
+      const rows = await submitToGemini({ text: trimmed });
+      if (rows) {
+        const newItems = rowsToItems(rows);
+        logPipeline(`Merging ${String(newItems.length)} item(s) into list…`);
+        updateList([...items, ...newItems]);
+        logPipeline("List saved (local + sync when online).");
+        setListText("");
+        setStatus(isOnline ? "Saved and synced." : "Saved locally. Will sync when online.");
+      } else {
+        setStatus((s) => s || "No items found.");
+      }
     })();
   };
 
@@ -272,6 +285,7 @@ function InputPage() {
           Type your list
         </label>
         <textarea
+          ref={textareaRef}
           id="grocery-text"
           className="page__textarea"
           rows={4}
@@ -299,6 +313,10 @@ function InputPage() {
         className={`page__record${isRecording ? " page__record--active" : ""}`}
         onPointerDown={(e) => {
           e.preventDefault();
+          const ta = textareaRef.current;
+          insertSnapshotRef.current = ta
+            ? { text: ta.value, pos: ta.selectionStart }
+            : null;
           void startRecording();
         }}
         onPointerUp={(e) => {
@@ -341,18 +359,6 @@ function InputPage() {
         </pre>
       </details>
 
-      {lastAdded ? (
-        <ul className="page__preview">
-          {lastAdded.map((row, i) => (
-            <li key={`${row.item}-${i}`} className="page__preview-row">
-              <span className="page__preview-name">{row.item}</span>
-              {row.category ? (
-                <span className="page__preview-cat"> — {row.category}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </main>
   );
 }
