@@ -24,6 +24,19 @@ function RootLayout() {
   const isOnline = useOnlineStatus();
   const isSyncing = useGrocerySyncing();
   const queryClient = useQueryClient();
+  const refresh = () =>
+    void queryClient.invalidateQueries({ queryKey: GROCERY_QUERY_KEY });
+
+  // iOS only runs shortcuts from the web by switching to the Shortcuts app; refetch once the user comes back.
+  const syncReminders = () => {
+    const onReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onReturn);
+      refresh();
+    };
+    document.addEventListener("visibilitychange", onReturn);
+    window.location.href = "shortcuts://run-shortcut?name=GroSync";
+  };
 
   return (
     <div className="shell">
@@ -62,11 +75,17 @@ function RootLayout() {
             type="button"
             className="shell__link"
             disabled={isSyncing}
-            onClick={() =>
-              void queryClient.invalidateQueries({ queryKey: GROCERY_QUERY_KEY })
-            }
+            onClick={refresh}
           >
             Refresh
+          </button>
+          <button
+            type="button"
+            className="shell__link"
+            title="Sync with Apple Reminders (runs the GroSync shortcut)"
+            onClick={syncReminders}
+          >
+            Sync
           </button>
           <button
             type="button"
