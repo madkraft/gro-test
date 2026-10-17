@@ -227,8 +227,9 @@ button:disabled {
 }
 
 .chip {
-  border: 2px dashed var(--ink);
+  border: 2px solid var(--ink);
   background: #fff;
+  box-shadow: 3px 3px 0 var(--ink);
   padding: 0.35rem 0.6rem;
 }
 
@@ -236,7 +237,6 @@ button:disabled {
 @media (hover: hover) {
   .chip:hover {
     background: var(--hi);
-    border-style: solid;
   }
 
   .row__check:hover {
