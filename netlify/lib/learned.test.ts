@@ -12,5 +12,6 @@ const learned = learnCategories(items);
 assert.equal(learned.get("mleko"), "🥤 Napoje", "later categorization wins");
 assert.equal(categoryOf(it("CHLEB ", "❓ Inne", "5"), learned), "🥯 Piekarnia");
 assert.equal(categoryOf(it("ser", "❓ Inne", "5"), learned), "❓ Inne");
-assert.deepEqual(pastNames(items).map((p) => [p.name, p.count]), [["mleko", 2], ["Chleb", 2]]);
+assert.deepEqual(pastNames(items).map((p) => [p.name, p.count]), [["mleko", 2], ["Chleb", 2]], "ties broken by most recent");
+assert.deepEqual(pastNames([...items, it("ser", "❓ Inne", "9")]).map((p) => p.name), ["mleko", "Chleb", "ser"]);
 console.log("ok");

@@ -14,7 +14,7 @@ export function learnCategories(items: GroceryItem[]): Map<string, string> {
 export const categoryOf = (item: GroceryItem, learned: Map<string, string>) =>
   item.category === OTHER_CATEGORY ? (learned.get(norm(item.item)) ?? OTHER_CATEGORY) : item.category;
 
-/** Distinct past item names, most frequently added first, with the latest spelling. */
+/** Distinct past item names, most frequently added first (ties: most recent), with the latest spelling. */
 export function pastNames(items: GroceryItem[]): { name: string; count: number }[] {
   const byKey = new Map<string, { name: string; count: number; last: string }>();
   for (const i of items) {
@@ -26,5 +26,5 @@ export function pastNames(items: GroceryItem[]): { name: string; count: number }
       if (i.createdAt > prev.last) Object.assign(prev, { name: i.item, last: i.createdAt });
     }
   }
-  return [...byKey.values()].sort((a, b) => b.count - a.count);
+  return [...byKey.values()].sort((a, b) => b.count - a.count || b.last.localeCompare(a.last));
 }
