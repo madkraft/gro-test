@@ -1,4 +1,6 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import { GROCERY_QUERY_KEY } from "../hooks/useGroceryList";
 import { useGrocerySyncing } from "../hooks/useGrocerySyncing";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
@@ -21,6 +23,7 @@ async function hardReloadApp() {
 function RootLayout() {
   const isOnline = useOnlineStatus();
   const isSyncing = useGrocerySyncing();
+  const queryClient = useQueryClient();
 
   return (
     <div className="shell">
@@ -55,6 +58,16 @@ function RootLayout() {
               offline
             </span>
           )}
+          <button
+            type="button"
+            className="shell__link"
+            disabled={isSyncing}
+            onClick={() =>
+              void queryClient.invalidateQueries({ queryKey: GROCERY_QUERY_KEY })
+            }
+          >
+            Refresh
+          </button>
           <button
             type="button"
             className="shell__link"
