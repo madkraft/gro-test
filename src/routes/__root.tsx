@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import { Outlet, createRootRoute } from "@tanstack/react-router";
 import { GROCERY_QUERY_KEY } from "../hooks/useGroceryList";
 import { useGrocerySyncing } from "../hooks/useGrocerySyncing";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -40,62 +40,33 @@ function RootLayout() {
 
   return (
     <div className="shell">
-      <header className="shell__nav">
-        <div className="shell__nav-links">
-          <Link
-            to="/input"
-            className="shell__link"
-            activeProps={{ className: "shell__link shell__link--active" }}
-            inactiveProps={{ className: "shell__link" }}
-          >
-            DODAJ
-          </Link>
-          <span className="shell__sep">·</span>
-          <Link
-            to="/list"
-            className="shell__link"
-            activeProps={{ className: "shell__link shell__link--active" }}
-            inactiveProps={{ className: "shell__link" }}
-          >
-            LISTA
-          </Link>
-        </div>
-        <div className="shell__nav-end">
-          {isSyncing ? (
-            <span className="shell__sync" aria-live="polite">
-              Syncing…
-            </span>
-          ) : null}
-          {isOnline ? null : (
-            <span className="shell__offline" aria-live="polite">
-              offline
-            </span>
-          )}
-          <button
-            type="button"
-            className="shell__link"
-            disabled={isSyncing}
-            onClick={refresh}
-          >
+      <header className="masthead">
+        <h1 className="masthead__title">Zakupy!</h1>
+        <p className="masthead__meta">
+          {isOnline ? null : <span className="masthead__offline">● offline</span>}
+          {isSyncing ? <span aria-live="polite">saving…</span> : null}
+        </p>
+        <nav className="toolbar" aria-label="Sync">
+          <button type="button" className="toolbar__btn" disabled={isSyncing} onClick={refresh}>
             Refresh
           </button>
           <button
             type="button"
-            className="shell__link"
+            className="toolbar__btn"
             title="Sync with Apple Reminders (runs the GroSync shortcut)"
             onClick={syncReminders}
           >
-            Sync
+            Sync Reminders
           </button>
           <button
             type="button"
-            className="shell__link"
+            className="toolbar__btn"
             title="Unregister service worker, clear caches, reload (fixes stale PWA)"
             onClick={() => void hardReloadApp()}
           >
             Hard reload
           </button>
-        </div>
+        </nav>
       </header>
       <Outlet />
     </div>

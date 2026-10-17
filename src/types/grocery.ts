@@ -22,3 +22,5 @@ export const CATEGORIES = [
   "🧒 Julcia",
   "❓ Inne",
 ] as const;
+
+export const OTHER_CATEGORY: string = "❓ Inne";

@@ -14,8 +14,8 @@ export default defineConfig({
         name: "Grocery Assistant",
         short_name: "Groceries",
         description: "Bilingual AI grocery list",
-        theme_color: "#FAFAF7",
-        background_color: "#FAFAF7",
+        theme_color: "#fff8dc",
+        background_color: "#fff8dc",
         display: "standalone",
         icons: [
           {

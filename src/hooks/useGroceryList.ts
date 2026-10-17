@@ -9,7 +9,8 @@ export const GROCERY_QUERY_KEY = ["grocery-items"] as const;
 
 export function useGroceryList(): {
   items: GroceryItem[];
-  updateList: (next: GroceryItem[]) => void;
+  /** Applies `fn` to the latest cached list, so quick successive edits don't overwrite each other. */
+  update: (fn: (items: GroceryItem[]) => GroceryItem[]) => void;
   isOnline: boolean;
 } {
   const isOnline = useOnlineStatus();
@@ -57,16 +58,17 @@ export function useGroceryList(): {
     },
   });
 
-  const updateList = useCallback(
-    (next: GroceryItem[]) => {
-      mutation.mutate(next);
+  const { mutate } = mutation;
+  const update = useCallback(
+    (fn: (items: GroceryItem[]) => GroceryItem[]) => {
+      mutate(fn(queryClient.getQueryData<GroceryItem[]>(GROCERY_QUERY_KEY) ?? []));
     },
-    [mutation],
+    [mutate, queryClient],
   );
 
   return {
     items: query.data ?? [],
-    updateList,
+    update,
     isOnline,
   };
 }

@@ -1,7 +1,7 @@
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { Navigate, RouterProvider, createRouter } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
@@ -27,7 +27,8 @@ const persister = createSyncStoragePersister({
   storage: window.localStorage,
 });
 
-const router = createRouter({ routeTree });
+// Old home-screen installs may still open /input or /list.
+const router = createRouter({ routeTree, defaultNotFoundComponent: () => <Navigate to="/" /> });
 
 declare module "@tanstack/react-router" {
   interface Register {
