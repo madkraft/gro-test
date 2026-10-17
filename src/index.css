@@ -232,10 +232,16 @@ button:disabled {
   padding: 0.35rem 0.6rem;
 }
 
-.chip:hover,
-.chip:active {
-  background: var(--hi);
-  border-style: solid;
+/* iOS fires :active on touchstart, so swiping across chips would flash them; highlight on real hover only. */
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--hi);
+    border-style: solid;
+  }
+
+  .row__check:hover {
+    background: var(--hi);
+  }
 }
 
 .status {
@@ -309,11 +315,6 @@ button:disabled {
   border-right: 2px solid var(--ink);
   background: none;
   font-weight: 700;
-}
-
-.row__check:hover,
-.row__check:active {
-  background: var(--hi);
 }
 
 .row__name {
