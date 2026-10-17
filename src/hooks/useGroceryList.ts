@@ -34,6 +34,8 @@ export function useGroceryList(): {
     // One-time migration: seed the cache from the old localStorage key if
     // TanStack's own persisted cache is empty (e.g. first run after upgrade).
     initialData: getItems,
+    // The GroSync automation writes to Blobs in the background; pick that up whenever the app is reopened.
+    refetchOnWindowFocus: "always",
   });
 
   const mutation = useMutation({

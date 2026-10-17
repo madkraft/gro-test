@@ -3,7 +3,7 @@ import { reconcile, type SyncedItem } from "../lib/reconcile";
 
 const FALLBACK_CATEGORY = "❓ Inne";
 
-// Called by the "GroSync" iOS Shortcut: body { titles: "<open reminders, one per line>" }.
+// Called by the "GroSync" iOS Shortcut (run by a Personal Automation): body { titles: "<open reminders, one per line>" }.
 export default async (req: Request) => {
   if (req.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
