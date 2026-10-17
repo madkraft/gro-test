@@ -41,7 +41,9 @@ function ListPage() {
 
   const categories = useMemo(() => {
     return Array.from(grouped.keys()).sort(
-      (a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b),
+      (a, b) =>
+        (CATEGORIES as readonly string[]).indexOf(a) -
+        (CATEGORIES as readonly string[]).indexOf(b),
     );
   }, [grouped]);
 

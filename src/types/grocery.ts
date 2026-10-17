@@ -4,6 +4,9 @@ export type GroceryItem = {
   category: string;
   bought: boolean;
   createdAt: string;
+  /** Set by reminders-sync; see netlify/lib/reconcile.ts. */
+  reminderTitle?: string;
+  reminderDone?: boolean;
 };
 
 export const CATEGORIES = [

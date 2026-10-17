@@ -1,4 +1,6 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import { GROCERY_QUERY_KEY } from "../hooks/useGroceryList";
 import { useGrocerySyncing } from "../hooks/useGrocerySyncing";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
@@ -21,6 +23,18 @@ async function hardReloadApp() {
 function RootLayout() {
   const isOnline = useOnlineStatus();
   const isSyncing = useGrocerySyncing();
+  const queryClient = useQueryClient();
+
+  // The shortcut writes to Blobs while the app is hidden; refetch when the user comes back.
+  const syncReminders = () => {
+    const onReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onReturn);
+      void queryClient.invalidateQueries({ queryKey: GROCERY_QUERY_KEY });
+    };
+    document.addEventListener("visibilitychange", onReturn);
+    window.location.href = "shortcuts://run-shortcut?name=GroSync";
+  };
 
   return (
     <div className="shell">
@@ -55,6 +69,14 @@ function RootLayout() {
               offline
             </span>
           )}
+          <button
+            type="button"
+            className="shell__link"
+            title="Sync with Apple Reminders (runs the GroSync shortcut)"
+            onClick={syncReminders}
+          >
+            Reminders
+          </button>
           <button
             type="button"
             className="shell__link"
